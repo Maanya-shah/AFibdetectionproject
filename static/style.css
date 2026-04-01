@@ -1,0 +1,185 @@
+/* ============================================================
+   AFib Detection AI — Professional Medical Stylesheet
+   Navy blue + white + accent colors
+   ============================================================ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #f4f6f9;
+  color: #1a2035;
+  line-height: 1.6;
+}
+
+/* ---- HEADER ---- */
+header {
+  background: linear-gradient(135deg, #0d1b4b 0%, #1a3a8c 100%);
+  color: white;
+  padding: 1rem 2rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+.header-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; gap: 1.5rem; }
+.logo { font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px; }
+.logo span { color: #5dade2; }
+.tagline { font-size: 0.9rem; opacity: 0.85; }
+
+/* ---- HERO ---- */
+.hero { background: linear-gradient(135deg, #1a3a8c 0%, #0d1b4b 100%); color: white; padding: 3rem 2rem; }
+.hero-inner { max-width: 1100px; margin: 0 auto; }
+.hero h1 { font-size: 2rem; font-weight: 800; margin-bottom: 1rem; line-height: 1.2; }
+.hero p  { font-size: 1.05rem; opacity: 0.9; max-width: 700px; margin-bottom: 2rem; }
+
+.stats-row { display: flex; gap: 2rem; flex-wrap: wrap; }
+.stat { background: rgba(255,255,255,0.12); border-radius: 10px; padding: 1rem 1.5rem; text-align: center; min-width: 130px; }
+.stat-num   { display: block; font-size: 1.8rem; font-weight: 800; color: #5dade2; }
+.stat-label { display: block; font-size: 0.8rem; opacity: 0.85; margin-top: 0.2rem; }
+
+/* ---- MAIN ---- */
+main { max-width: 1100px; margin: 2rem auto; padding: 0 1.5rem; }
+
+/* ---- UPLOAD SECTION ---- */
+.upload-section {
+  background: white; border-radius: 16px; padding: 2.5rem;
+  box-shadow: 0 2px 20px rgba(0,0,0,0.08); margin-bottom: 2rem;
+}
+.upload-section h2 { font-size: 1.5rem; color: #0d1b4b; margin-bottom: 1.5rem; }
+
+.form-group { margin-bottom: 1.4rem; }
+.form-group label { display: block; font-weight: 600; margin-bottom: 0.4rem; color: #1a2035; }
+.required { color: #e74c3c; }
+.optional { font-weight: 400; font-size: 0.85rem; color: #777; }
+
+input[type="number"], select {
+  width: 100%; padding: 0.7rem 1rem; border: 2px solid #dde3f0;
+  border-radius: 8px; font-size: 1rem; transition: border-color 0.2s;
+  background: #f8f9fc;
+}
+input[type="number"]:focus, select:focus {
+  outline: none; border-color: #1a3a8c; background: white;
+}
+
+.form-row { display: flex; gap: 1.5rem; }
+.form-group.half { flex: 1; }
+
+.form-section-title {
+  font-size: 1rem; font-weight: 700; color: #0d1b4b;
+  margin: 1.5rem 0 0.8rem; padding-bottom: 0.4rem;
+  border-bottom: 2px solid #eaecf5;
+}
+
+/* ---- FILE DROP ---- */
+.file-drop {
+  position: relative; border: 2px dashed #a0aec0; border-radius: 10px;
+  padding: 2rem; text-align: center; background: #f8f9fc;
+  transition: border-color 0.2s, background 0.2s; cursor: pointer;
+}
+.file-drop:hover { border-color: #1a3a8c; background: #eef2fb; }
+.file-drop input[type="file"] {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  opacity: 0; cursor: pointer;
+}
+.file-drop-label { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; pointer-events: none; }
+.file-icon { font-size: 2rem; }
+.file-hint { font-size: 0.8rem; color: #888; }
+.file-name-display { margin-top: 0.5rem; font-size: 0.9rem; color: #27ae60; font-weight: 600; }
+
+.sample-note { font-size: 0.85rem; color: #666; margin-bottom: 1.2rem; }
+.sample-note a { color: #1a3a8c; font-weight: 600; }
+
+/* ---- CHECKBOXES ---- */
+.checkbox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.8rem; margin-bottom: 1.5rem; }
+.checkbox-label {
+  display: flex; align-items: flex-start; gap: 0.7rem; padding: 0.9rem 1rem;
+  border: 2px solid #dde3f0; border-radius: 10px; cursor: pointer;
+  transition: border-color 0.2s, background 0.2s; background: #f8f9fc;
+}
+.checkbox-label:hover { border-color: #1a3a8c; background: #eef2fb; }
+.checkbox-label input[type="checkbox"] { margin-top: 3px; width: 16px; height: 16px; accent-color: #1a3a8c; }
+.checkbox-label small { color: #888; font-size: 0.8rem; }
+
+/* ---- BUTTONS ---- */
+.btn-primary {
+  display: inline-block; background: linear-gradient(135deg, #1a3a8c, #0d1b4b);
+  color: white; padding: 0.8rem 2rem; border: none; border-radius: 10px;
+  font-size: 1rem; font-weight: 700; cursor: pointer; text-decoration: none;
+  transition: opacity 0.2s, transform 0.1s;
+}
+.btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.btn-large { width: 100%; text-align: center; padding: 1rem; font-size: 1.1rem; margin-top: 0.5rem; }
+
+.loading-msg { text-align: center; color: #666; margin-top: 1rem; font-size: 0.95rem; }
+
+/* ---- HOW IT WORKS ---- */
+.how-it-works { background: white; border-radius: 16px; padding: 2.5rem; box-shadow: 0 2px 20px rgba(0,0,0,0.08); }
+.how-it-works h2 { font-size: 1.5rem; color: #0d1b4b; margin-bottom: 1.5rem; }
+.steps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.5rem; }
+.step { text-align: center; padding: 1.5rem; }
+.step-num {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: linear-gradient(135deg, #1a3a8c, #5dade2);
+  color: white; font-size: 1.4rem; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;
+}
+.step h4 { color: #0d1b4b; margin-bottom: 0.4rem; font-size: 1rem; }
+.step p  { color: #555; font-size: 0.9rem; }
+
+/* ---- RESULTS ---- */
+.results-section { border-radius: 16px; padding: 2.5rem; margin-bottom: 2rem; box-shadow: 0 2px 20px rgba(0,0,0,0.08); }
+
+.risk-badge {
+  display: inline-block; color: white; font-size: 1.5rem; font-weight: 900;
+  padding: 0.6rem 2rem; border-radius: 50px; margin-bottom: 1.5rem;
+  letter-spacing: 2px;
+}
+
+.results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+
+.result-card {
+  background: white; border-radius: 12px; padding: 1.5rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.result-card h3 { color: #0d1b4b; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.6rem; }
+.big-number { font-size: 3rem; font-weight: 900; line-height: 1; margin-bottom: 0.5rem; }
+.result-card p { color: #555; font-size: 0.9rem; margin-bottom: 0.4rem; }
+.model-breakdown { margin-top: 0.8rem; font-size: 0.82rem; color: #777; display: flex; flex-direction: column; gap: 0.2rem; }
+.vitals-row { display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid #f0f0f0; font-size: 0.9rem; }
+.vitals-row strong { color: #0d1b4b; }
+
+.ecg-plot-section { margin-bottom: 2rem; }
+.ecg-plot-section h3 { color: #0d1b4b; margin-bottom: 0.8rem; }
+.ecg-img { width: 100%; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+.ecg-caption { font-size: 0.82rem; color: #777; margin-top: 0.5rem; }
+
+.explanation-box {
+  background: white; border-left: 4px solid; border-radius: 10px;
+  padding: 1.5rem; margin-bottom: 1.5rem;
+}
+.explanation-box h3 { color: #0d1b4b; margin-bottom: 0.8rem; }
+.explanation-box p  { color: #444; line-height: 1.7; }
+
+.recommendation {
+  color: white; padding: 0.8rem 1.2rem; border-radius: 8px;
+  margin-top: 1rem; font-weight: 700; font-size: 0.95rem;
+}
+
+.disclaimer {
+  background: #fef9e7; border: 1px solid #f0c040; border-radius: 8px;
+  padding: 1rem 1.2rem; font-size: 0.85rem; color: #7d6608; margin-bottom: 1rem;
+}
+
+/* ---- FOOTER ---- */
+footer {
+  background: #0d1b4b; color: rgba(255,255,255,0.7);
+  text-align: center; padding: 2rem; margin-top: 3rem; font-size: 0.85rem; line-height: 1.8;
+}
+
+/* ---- RESPONSIVE ---- */
+@media (max-width: 600px) {
+  .hero h1 { font-size: 1.4rem; }
+  .stats-row { gap: 1rem; }
+  .form-row { flex-direction: column; }
+  .results-grid { grid-template-columns: 1fr; }
+  .big-number { font-size: 2.2rem; }
+}

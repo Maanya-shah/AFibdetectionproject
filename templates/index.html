@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AFib Detection AI — Silent Stroke Prevention</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- ===================== HEADER ===================== -->
+<header>
+  <div class="header-inner">
+    <div class="logo">&#9829; AFib<span>AI</span></div>
+    <div class="tagline">AI-Powered Silent Atrial Fibrillation Detection &amp; Stroke Risk Assessment</div>
+  </div>
+</header>
+
+<!-- ===================== HERO ===================== -->
+<section class="hero">
+  <div class="hero-inner">
+    <h1>Detect Silent AFib Before It Causes a Stroke</h1>
+    <p>Upload a 30–60 second single-lead ECG recording. Our CNN-LSTM hybrid AI analyzes your heart rhythm in seconds and calculates your personalized stroke risk score.</p>
+    <div class="stats-row">
+      <div class="stat"><span class="stat-num">1 in 4</span><span class="stat-label">strokes caused by AFib</span></div>
+      <div class="stat"><span class="stat-num">30%</span><span class="stat-label">of AFib is silent</span></div>
+      <div class="stat"><span class="stat-num">$12</span><span class="stat-label">device cost vs $800 Holter</span></div>
+      <div class="stat"><span class="stat-num">97.2%</span><span class="stat-label">AUC-ROC</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== MAIN CONTENT ===================== -->
+<main>
+
+  {% if result %}
+  <!-- ===== RESULTS SECTION ===== -->
+  <section class="results-section" style="background:{{ risk_bg }}; border-left: 6px solid {{ risk_color }};">
+
+    <!-- Risk badge -->
+    <div class="risk-badge" style="background:{{ risk_color }};">
+      {{ risk_level }} RISK
+    </div>
+
+    <div class="results-grid">
+
+      <!-- Left: AFib probability -->
+      <div class="result-card">
+        <h3>AFib Probability</h3>
+        <div class="big-number" style="color:{{ risk_color }};">{{ afib_prob_pct }}%</div>
+        <p>{% if afib_detected %}AFib pattern <strong>detected</strong> in your ECG.{% else %}No significant AFib pattern detected.{% endif %}</p>
+        <div class="model-breakdown">
+          <span>CNN-LSTM model: <strong>{{ cnn_prob_pct }}%</strong></span>
+          <span>Random Forest: <strong>{{ rf_prob_pct }}%</strong></span>
+        </div>
+      </div>
+
+      <!-- Middle: Stroke risk -->
+      <div class="result-card">
+        <h3>Annual Stroke Risk</h3>
+        <div class="big-number" style="color:{{ risk_color }};">{{ annual_stroke_risk }}%</div>
+        <p>CHA&#8322;DS&#8322;-VASc Score: <strong>{{ chads_score }} / 9</strong></p>
+        <p>Based on age ({{ age }}), sex, and medical history.</p>
+      </div>
+
+      <!-- Right: ECG vitals -->
+      <div class="result-card">
+        <h3>ECG Vitals</h3>
+        <div class="vitals-row"><span>Heart Rate</span><strong>{{ hr_bpm }} bpm</strong></div>
+        <div class="vitals-row"><span>Beats detected</span><strong>{{ n_peaks }}</strong></div>
+        <div class="vitals-row"><span>Analysis</span><strong>Complete</strong></div>
+      </div>
+
+    </div>
+
+    <!-- ECG plot -->
+    <div class="ecg-plot-section">
+      <h3>Your ECG Recording</h3>
+      <img src="/{{ ecg_plot }}" alt="ECG Waveform" class="ecg-img">
+      <p class="ecg-caption">Orange dots mark detected heartbeats (R-peaks). Irregular spacing = possible AFib.</p>
+    </div>
+
+    <!-- Explanation -->
+    <div class="explanation-box" style="border-color:{{ risk_color }};">
+      <h3>What This Means</h3>
+      <p>{{ explanation }}</p>
+      <div class="recommendation" style="background:{{ risk_color }};">
+        &#9873; {{ recommendation }}
+      </div>
+    </div>
+
+    <div class="disclaimer">
+      &#9888; <strong>Disclaimer:</strong> This tool is for <strong>screening purposes only</strong> and does not replace clinical diagnosis. Always consult a qualified healthcare professional for medical advice.
+    </div>
+
+    <!-- Analyze another -->
+    <div style="text-align:center; margin-top:2rem;">
+      <a href="/" class="btn-primary">Analyze Another ECG</a>
+    </div>
+
+  </section>
+  {% endif %}
+
+  <!-- ===== UPLOAD FORM ===== -->
+  {% if not result %}
+  <section class="upload-section">
+    <h2>Upload Your ECG</h2>
+    <form action="/analyze" method="POST" enctype="multipart/form-data" id="upload-form">
+
+      <!-- ECG file -->
+      <div class="form-group">
+        <label>ECG Recording File <span class="required">*</span></label>
+        <div class="file-drop" id="file-drop">
+          <input type="file" name="ecg_file" id="ecg_file" accept=".mat,.csv" required>
+          <div class="file-drop-label">
+            <span class="file-icon">&#128190;</span>
+            <span>Drop your ECG file here or <u>browse</u></span>
+            <span class="file-hint">Accepts .mat (PhysioNet) or .csv files &nbsp;|&nbsp; 30–60 seconds recommended</span>
+          </div>
+        </div>
+        <div id="file-name" class="file-name-display"></div>
+      </div>
+
+      <!-- Sample download -->
+      <div class="sample-note">
+        No ECG file? <a href="/static/sample_ecg.csv" download>Download a sample ECG</a> to test the demo.
+      </div>
+
+      <!-- Patient info -->
+      <div class="form-section-title">Patient Information</div>
+
+      <div class="form-row">
+        <div class="form-group half">
+          <label>Age <span class="required">*</span></label>
+          <input type="number" name="age" min="18" max="120" value="65" required>
+        </div>
+        <div class="form-group half">
+          <label>Biological Sex <span class="required">*</span></label>
+          <select name="sex">
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Medical history -->
+      <div class="form-section-title">Medical History <span class="optional">(check all that apply)</span></div>
+      <div class="checkbox-grid">
+        <label class="checkbox-label">
+          <input type="checkbox" name="hypertension">
+          <span>Hypertension<br><small>High blood pressure</small></span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" name="diabetes">
+          <span>Diabetes<br><small>Type 1 or 2</small></span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" name="prior_stroke">
+          <span>Prior Stroke or TIA<br><small>Previous stroke or mini-stroke</small></span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" name="heart_failure">
+          <span>Heart Failure<br><small>Congestive heart failure</small></span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" name="vascular_disease">
+          <span>Vascular Disease<br><small>Heart attack, peripheral artery disease</small></span>
+        </label>
+      </div>
+
+      <button type="submit" class="btn-primary btn-large" id="submit-btn">
+        &#9889; Analyze My ECG
+      </button>
+
+      <div id="loading" class="loading-msg" style="display:none;">
+        &#8987; Analyzing your ECG — this takes 5–10 seconds...
+      </div>
+
+    </form>
+  </section>
+
+  <!-- ===== HOW IT WORKS ===== -->
+  <section class="how-it-works">
+    <h2>How It Works</h2>
+    <div class="steps-grid">
+      <div class="step"><div class="step-num">1</div><h4>Upload ECG</h4><p>Upload a 30–60 second single-lead ECG file (.mat or .csv)</p></div>
+      <div class="step"><div class="step-num">2</div><h4>AI Analysis</h4><p>CNN-LSTM and Random Forest models analyze heart rhythm patterns in parallel</p></div>
+      <div class="step"><div class="step-num">3</div><h4>Risk Score</h4><p>CHA₂DS₂-VASc clinical scoring combines with AI probability for a composite risk</p></div>
+      <div class="step"><div class="step-num">4</div><h4>Clear Results</h4><p>Plain English risk assessment with ECG visualization and next steps</p></div>
+    </div>
+  </section>
+  {% endif %}
+
+</main>
+
+<!-- ===================== FOOTER ===================== -->
+<footer>
+  <p>AFib Detection AI &mdash; Science Fair Project &mdash; Powered by CNN-LSTM + Random Forest</p>
+  <p>Dataset: PhysioNet CinC Challenge 2017 &nbsp;|&nbsp; AUC-ROC: 0.972 &nbsp;|&nbsp; Sensitivity: 92.8%</p>
+  <p style="font-size:0.75rem; opacity:0.7;">For educational and screening purposes only. Not a medical device.</p>
+</footer>
+
+<script>
+  // Show filename when user selects a file
+  document.getElementById('ecg_file').addEventListener('change', function() {
+    const name = this.files[0] ? this.files[0].name : '';
+    document.getElementById('file-name').textContent = name ? '✓ Selected: ' + name : '';
+  });
+
+  // Show loading spinner on submit
+  document.getElementById('upload-form').addEventListener('submit', function() {
+    document.getElementById('submit-btn').disabled = true;
+    document.getElementById('submit-btn').textContent = 'Analyzing...';
+    document.getElementById('loading').style.display = 'block';
+  });
+</script>
+
+</body>
+</html>

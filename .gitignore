@@ -1,0 +1,20 @@
+# Virtual environment
+afib_env/
+
+# Dataset (too large for GitHub -- 99MB zip, 8528 ECG files)
+data/cinc2017/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary upload files from Flask
+static/results/
