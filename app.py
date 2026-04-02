@@ -18,6 +18,7 @@ from flask import Flask, request, render_template, jsonify
 from scipy.signal import butter, filtfilt, iirnotch, find_peaks
 import joblib
 from tensorflow import keras
+import tensorflow as tf
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
@@ -35,6 +36,23 @@ CNN_THRESH = float(np.load('models/cnn_lstm_threshold.npy')[0])
 FS         = 300
 SEG_LEN    = 9000
 print(f"Models loaded. CNN threshold = {CNN_THRESH:.3f}")
+
+# ============================================================
+# GRAD-CAM SETUP
+# ============================================================
+# Build a sub-model that outputs BOTH the last Conv1D feature maps
+# AND the final probability — needed to compute gradients.
+_last_conv = None
+for _layer in CNN_MODEL.layers:
+    if isinstance(_layer, keras.layers.Conv1D):
+        _last_conv = _layer   # keep updating — last Conv1D wins
+
+GRAD_MODEL = keras.Model(
+    inputs  = CNN_MODEL.input,
+    outputs = [_last_conv.output, CNN_MODEL.output]
+)
+print(f"Grad-CAM layer: {_last_conv.name}")
+
 
 # ============================================================
 # PREPROCESSING FUNCTIONS
@@ -184,6 +202,84 @@ def generate_ecg_plot(signal, peaks, result_id, afib_prob):
     plt.close()
     return out_path
 
+
+# ============================================================
+# GRAD-CAM COMPUTATION
+# ============================================================
+
+def compute_gradcam(seg_input):
+    # seg_input: shape (1, 9000, 1) float32 tensor ready for the model
+    inp = tf.constant(seg_input, dtype=tf.float32)
+
+    # Record operations so we can compute gradients afterward
+    with tf.GradientTape() as tape:
+        tape.watch(inp)
+        conv_outputs, predictions = GRAD_MODEL(inp)  # forward pass
+        afib_prob = predictions[:, 0]                # AFib probability
+
+    # How much does each conv feature map affect the AFib probability?
+    grads       = tape.gradient(afib_prob, conv_outputs)  # (1, timesteps, filters)
+    pooled      = tf.reduce_mean(grads, axis=(0, 1))       # one score per filter
+
+    # Weight each filter map by its importance and sum across filters
+    conv_out    = conv_outputs[0]                           # (timesteps, filters)
+    heatmap     = conv_out @ pooled[..., tf.newaxis]       # (timesteps, 1)
+    heatmap     = tf.squeeze(heatmap).numpy()
+
+    # ReLU: only keep regions that push toward AFib (positive contributions)
+    heatmap     = np.maximum(heatmap, 0)
+    heatmap     = heatmap / (heatmap.max() + 1e-8)         # normalize 0-1
+
+    # Upsample from ~140 timesteps (conv output) back to 9000 (ECG length)
+    heatmap_up  = np.interp(
+        np.linspace(0, 1, SEG_LEN),
+        np.linspace(0, 1, len(heatmap)),
+        heatmap
+    )
+    return heatmap_up
+
+
+def generate_gradcam_plot(signal, heatmap, result_id, afib_prob, predicted_label):
+    # Generates ECG with red Grad-CAM attention heatmap overlaid.
+    # Saves as static/results/{result_id}_gradcam.png
+    fig, ax = plt.subplots(figsize=(14, 4))
+
+    n_show    = min(int(10 * FS), len(signal))  # show first 10 seconds
+    t         = np.arange(n_show) / FS
+    sig       = signal[:n_show]
+    heat_show = heatmap[:n_show]
+
+    ax.set_facecolor('#fafafa')
+    fig.patch.set_facecolor('#fafafa')
+
+    # Plot ECG as dark line
+    ax.plot(t, sig, color='#1a252f', linewidth=0.9, zorder=2, label='ECG signal')
+
+    # Overlay red attention heatmap in chunks of 50 samples
+    step = 50
+    for i in range(0, n_show - step, step):
+        alpha_val = float(heat_show[i:i+step].mean()) * 0.65
+        if alpha_val > 0.03:
+            ax.axvspan(t[i], t[i+step],
+                       alpha=alpha_val, color='#e74c3c',
+                       linewidth=0, zorder=1)
+
+    ax.set_xlabel('Time (seconds)', fontsize=11)
+    ax.set_ylabel('Amplitude (normalized)', fontsize=11)
+    ax.set_title(
+        f'CNN Attention Map (Grad-CAM)  |  Predicted: {predicted_label}  ({afib_prob*100:.1f}% AFib probability)  |  Red shading = regions the CNN focused on',
+        fontsize=11, fontweight='bold'
+    )
+    ax.legend(fontsize=9, loc='upper right')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_xlim(0, t[-1])
+
+    out_path = f'static/results/{result_id}_gradcam.png'
+    plt.savefig(out_path, dpi=120, bbox_inches='tight', facecolor='#fafafa')
+    plt.close()
+    return out_path
+
 # ============================================================
 # FLASK ROUTES
 # ============================================================
@@ -239,6 +335,7 @@ def analyze():
 
     seg_input  = seg.reshape(1, SEG_LEN, 1).astype(np.float32)
     cnn_prob   = float(CNN_MODEL.predict(seg_input, verbose=0)[0][0])
+    gradcam_heatmap = compute_gradcam(seg_input)  # Grad-CAM heatmap
 
     # ---- 5. Run Random Forest (secondary model for cross-check) ----
     feats = extract_features(clean_signal)
@@ -288,6 +385,8 @@ def analyze():
 
     # ---- 10. Generate ECG plot ----
     ecg_plot_path = generate_ecg_plot(clean_signal, peaks, result_id, afib_prob)
+    predicted_label = 'AFib Detected' if afib_prob >= CNN_THRESH else 'Normal Rhythm'
+    gradcam_plot_path = generate_gradcam_plot(clean_signal, gradcam_heatmap, result_id, afib_prob, predicted_label)
 
     # ---- 11. Plain English explanation ----
     if risk_level == 'HIGH':
@@ -330,6 +429,7 @@ def analyze():
         hr_bpm        = f"{hr_bpm:.0f}" if hr_bpm else "N/A",
         n_peaks       = len(peaks),
         ecg_plot      = ecg_plot_path,
+        gradcam_plot  = gradcam_plot_path,
         explanation   = explanation,
         recommendation= recommendation,
         age=age, sex=sex,

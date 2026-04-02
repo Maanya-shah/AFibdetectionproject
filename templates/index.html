@@ -80,6 +80,17 @@
       <p class="ecg-caption">Orange dots mark detected heartbeats (R-peaks). Irregular spacing = possible AFib.</p>
     </div>
 
+    <!-- Grad-CAM attention map -->
+    <div class="ecg-plot-section" style="margin-top:1.5rem;">
+      <h3>CNN Attention Map <span style="font-size:0.8em; font-weight:normal; color:#666;">(Grad-CAM Explainability)</span></h3>
+      <img src="/{{ gradcam_plot }}" alt="Grad-CAM Heatmap" class="ecg-img">
+      <p class="ecg-caption">
+        <strong>Red shading</strong> shows where the CNN focused when making its prediction.
+        For AFib recordings, red should cluster at <strong>irregular gaps between heartbeats</strong> &mdash;
+        the key clinical marker of Atrial Fibrillation.
+      </p>
+    </div>
+
     <!-- Explanation -->
     <div class="explanation-box" style="border-color:{{ risk_color }};">
       <h3>What This Means</h3>
