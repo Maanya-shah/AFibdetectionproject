@@ -18,3 +18,4 @@ Thumbs.db
 
 # Temporary upload files from Flask
 static/results/
+uploads/
