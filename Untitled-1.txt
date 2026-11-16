@@ -1,0 +1,3 @@
+cd "C:\Users\Maany\OneDrive\Documents\AFib Detection AI"
+afib_env\Scripts\activate
+python app.py

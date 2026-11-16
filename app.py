@@ -17,6 +17,7 @@ import matplotlib.cm as cm
 from flask import Flask, request, render_template, jsonify
 from scipy.signal import butter, filtfilt, iirnotch, find_peaks
 import joblib
+import shap
 from tensorflow import keras
 import tensorflow as tf
 
@@ -281,6 +282,110 @@ def generate_gradcam_plot(signal, heatmap, result_id, afib_prob, predicted_label
     return out_path
 
 # ============================================================
+# SHAP WATERFALL PLOT
+# ============================================================
+
+# Plain English labels for all 15 HRV features (same order as extract_features)
+FEATURE_NAMES = [
+    "Avg. beat interval (Mean RR)",       # mean_rr
+    "Beat interval variability (Std RR)", # std_rr
+    "Beat irregularity (RMSSD)",          # rmssd
+    "Abnormal intervals % (pNN50)",       # pnn50
+    "Relative variability (CV)",          # cv_rr
+    "Interval spread (Range RR)",         # range_rr
+    "Median beat interval",               # median_rr
+    "Middle 50% spread (IQR)",            # iqr_rr
+    "Rhythm complexity (Entropy)",        # entropy
+    "Short-term variability (SD1)",       # sd1
+    "Long-term variability (SD2)",        # sd2
+    "SD1/SD2 ratio",                      # sd_ratio
+    "Heart rate (bpm)",                   # hr_bpm
+    "Signal asymmetry (Skewness)",        # skew
+    "Signal sharpness (Kurtosis)",        # kurt
+]
+
+def generate_shap_plot(feats_scaled, result_id, rf_prob):
+    # Use SHAP TreeExplainer to find how much each HRV feature
+    # pushed the Random Forest prediction toward AFib or Normal.
+    explainer = shap.TreeExplainer(RF_MODEL)
+
+    # Compute SHAP values — handle both old and new SHAP API formats
+    shap_values = explainer.shap_values(feats_scaled)
+
+    # SHAP 0.49.x may return an Explanation object or a list
+    if hasattr(shap_values, 'values'):
+        # New API: Explanation object — .values shape is (samples, features, classes)
+        sv = shap_values.values[0, :, 1]
+    elif isinstance(shap_values, list) and len(shap_values) == 2:
+        # Old API: list of [Normal_array, AFib_array]
+        sv = np.array(shap_values[1][0])
+    elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
+        # Some versions: (samples, features, classes)
+        sv = shap_values[0, :, 1]
+    else:
+        # Fallback: treat as AFib values directly
+        sv = np.array(shap_values).flatten()[:len(FEATURE_NAMES)]
+
+    # Base value = what the model predicts with no patient-specific information
+    base_val = explainer.expected_value
+    if hasattr(base_val, '__len__'):
+        base_val = float(base_val[1]) if len(base_val) > 1 else float(base_val[0])
+    else:
+        base_val = float(base_val)
+
+    # Sort features so the most impactful ones appear at the top
+    order     = np.argsort(np.abs(sv))[::-1][:10]   # top 10 by absolute impact
+    names     = [FEATURE_NAMES[i] for i in order]
+    values    = sv[order]
+
+    # Build the horizontal bar chart
+    fig, ax = plt.subplots(figsize=(11, 6))
+    fig.patch.set_facecolor('#fafafa')
+    ax.set_facecolor('#fafafa')
+
+    # Red bar = pushes prediction toward AFib
+    # Blue bar = pushes prediction toward Normal (away from AFib)
+    colors = ['#e74c3c' if v > 0 else '#3498db' for v in values]
+
+    # Plot bars in reverse order so top feature is at the top of chart
+    ax.barh(range(len(values)), values[::-1],
+            color=colors[::-1], height=0.6,
+            edgecolor='white', linewidth=0.5)
+
+    # Label each bar with its numeric SHAP value
+    for i, val in enumerate(values[::-1]):
+        offset = 0.003 if val >= 0 else -0.003
+        ax.text(val + offset, i,
+                f'{val:+.3f}',
+                va='center',
+                ha='left' if val >= 0 else 'right',
+                fontsize=8, color='#333')
+
+    # Y-axis: feature names in reverse order (top feature at top)
+    ax.set_yticks(range(len(values)))
+    ax.set_yticklabels(names[::-1], fontsize=10)
+
+    # Vertical line at zero = the dividing line between AFib and Normal push
+    ax.axvline(0, color='#555', linewidth=0.8, linestyle='--')
+
+    ax.set_xlabel('SHAP value  (how much each feature moved the prediction)', fontsize=10)
+    ax.set_title(
+        f'Which Heart Rhythm Features Drove the AFib Prediction?\n'
+        f'Random Forest probability: {rf_prob*100:.1f}%  |  '
+        f'Red = pushes toward AFib  ·  Blue = pushes toward Normal',
+        fontsize=11, fontweight='bold', pad=12
+    )
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    plt.tight_layout()
+    out_path = f'static/results/{result_id}_shap.png'
+    plt.savefig(out_path, dpi=120, bbox_inches='tight', facecolor='#fafafa')
+    plt.close()
+    return out_path
+
+
+# ============================================================
 # FLASK ROUTES
 # ============================================================
 
@@ -339,9 +444,17 @@ def analyze():
 
     # ---- 5. Run Random Forest (secondary model for cross-check) ----
     feats = extract_features(clean_signal)
+    shap_plot_path = None   # default to None if features can't be extracted
     if feats is not None:
         feats_scaled = SCALER.transform([feats])
         rf_prob      = float(RF_MODEL.predict_proba(feats_scaled)[0][1])
+        # Generate SHAP waterfall showing which HRV features drove the prediction
+        try:
+            shap_plot_path = generate_shap_plot(feats_scaled, result_id, rf_prob)
+        except Exception as shap_err:
+            import traceback
+            print(f"SHAP plot failed: {shap_err}")
+            traceback.print_exc()   # prints full error details to terminal
     else:
         rf_prob = cnn_prob   # Fallback if signal too short
 
@@ -377,6 +490,17 @@ def analyze():
         risk_color = '#e74c3c'
         risk_bg    = '#fdf0f0'
 
+    # Composite stroke probability:
+    # P(stroke) = P(AFib) × base_stroke_risk_from_chadsvasc
+    # This combines the AI's confidence the patient HAS AFib with the
+    # clinical risk of stroke given they do have AFib.
+    # Source: January et al. 2019 AHA/ACC/HRS AFib Guidelines
+    composite_stroke_risk = round(afib_prob * annual_stroke_risk, 2)
+
+    # Treated stroke risk — anticoagulation reduces stroke risk by 65%
+    # Multiplier 0.35 = only 35% of untreated risk remains after treatment
+    treated_stroke_risk = round(composite_stroke_risk * 0.35, 2)
+
     # ---- 9. Heart rate estimate ----
     if len(peaks) >= 2:
         hr_bpm = len(peaks) / (len(clean_signal) / FS) * 60
@@ -392,25 +516,25 @@ def analyze():
     if risk_level == 'HIGH':
         explanation = (
             f"Your ECG shows strong signs of Atrial Fibrillation "
-            f"({afib_prob*100:.0f}% probability). Combined with your clinical risk "
-            f"factors (CHA\u2082DS\u2082-VASc score {chads_score}), your estimated "
-            f"annual stroke risk is {annual_stroke_risk}%. "
+            f"({afib_prob*100:.0f}% probability). Combined with your CHA\u2082DS\u2082-VASc "
+            f"score of {chads_score}, your composite annual stroke risk is {composite_stroke_risk}%. "
+            f"With anticoagulation therapy this could drop to {treated_stroke_risk}%. "
             f"We strongly recommend consulting a cardiologist promptly."
         )
         recommendation = "Please consult a cardiologist as soon as possible."
     elif risk_level == 'MODERATE':
         explanation = (
             f"Your ECG shows possible signs of Atrial Fibrillation "
-            f"({afib_prob*100:.0f}% probability). Your estimated annual stroke risk "
-            f"based on clinical factors is {annual_stroke_risk}%. "
-            f"Further evaluation is recommended."
+            f"({afib_prob*100:.0f}% probability). Your composite annual stroke risk "
+            f"is {composite_stroke_risk}%, which could drop to {treated_stroke_risk}% "
+            f"with anticoagulation therapy. Further evaluation is recommended."
         )
         recommendation = "Consider scheduling an appointment with a cardiologist."
     else:
         explanation = (
             f"Your ECG does not show significant signs of Atrial Fibrillation "
-            f"({afib_prob*100:.0f}% probability). Your estimated annual stroke risk "
-            f"is {annual_stroke_risk}%. Continue routine health monitoring."
+            f"({afib_prob*100:.0f}% probability). Your composite annual stroke risk "
+            f"is {composite_stroke_risk}%. Continue routine health monitoring."
         )
         recommendation = "No immediate action required. Maintain regular check-ups."
 
@@ -426,10 +550,13 @@ def analyze():
         rf_prob_pct   = f"{rf_prob*100:.1f}",
         chads_score   = chads_score,
         annual_stroke_risk = annual_stroke_risk,
+        composite_stroke_risk = composite_stroke_risk,
+        treated_stroke_risk = treated_stroke_risk,
         hr_bpm        = f"{hr_bpm:.0f}" if hr_bpm else "N/A",
         n_peaks       = len(peaks),
         ecg_plot      = ecg_plot_path,
         gradcam_plot  = gradcam_plot_path,
+        shap_plot     = shap_plot_path,
         explanation   = explanation,
         recommendation= recommendation,
         age=age, sex=sex,

@@ -57,10 +57,20 @@
 
       <!-- Middle: Stroke risk -->
       <div class="result-card">
-        <h3>Annual Stroke Risk</h3>
-        <div class="big-number" style="color:{{ risk_color }};">{{ annual_stroke_risk }}%</div>
-        <p>CHA&#8322;DS&#8322;-VASc Score: <strong>{{ chads_score }} / 9</strong></p>
-        <p>Based on age ({{ age }}), sex, and medical history.</p>
+        <h3>Composite Stroke Risk</h3>
+        <div class="big-number" style="color:{{ risk_color }};">{{ composite_stroke_risk }}%</div>
+        <p>P(AFib) &times; CHA&#8322;DS&#8322;-VASc base risk</p>
+        <div style="margin-top:0.5rem; font-size:0.85rem; color:#555; line-height:1.7;">
+          <div>AFib probability: <strong>{{ afib_prob_pct }}%</strong></div>
+          <div>CHA&#8322;DS&#8322;-VASc score: <strong>{{ chads_score }} / 9</strong> &rarr; base risk <strong>{{ annual_stroke_risk }}%</strong></div>
+          <div>= {{ afib_prob_pct }}% &times; {{ annual_stroke_risk }}% = <strong>{{ composite_stroke_risk }}%/year</strong></div>
+        </div>
+        <div style="margin-top:0.75rem; padding:0.6rem 0.8rem; background:#e8f8f0; border-left:3px solid #27ae60; border-radius:4px; font-size:0.9rem;">
+          <strong style="color:#27ae60;">With anticoagulation therapy:</strong><br>
+          Risk drops to <strong style="color:#27ae60;">{{ treated_stroke_risk }}%</strong>
+          <span style="color:#555;"> &mdash; a 65% reduction</span><br>
+          <small style="color:#777;">Source: January et al. 2019 AHA Guidelines</small>
+        </div>
       </div>
 
       <!-- Right: ECG vitals -->
@@ -90,6 +100,104 @@
         the key clinical marker of Atrial Fibrillation.
       </p>
     </div>
+
+    <!-- SHAP Physician Section -->
+    {% if shap_plot %}
+    <div style="margin-top:2rem; background:#fff; border:1px solid #dde3ea; border-radius:10px; overflow:hidden;">
+
+      <!-- Collapsible header — click to expand/collapse -->
+      <div id="physician-toggle"
+           onclick="document.getElementById('physician-body').style.display =
+                    document.getElementById('physician-body').style.display === 'none' ? 'block' : 'none'"
+           style="padding:1rem 1.4rem; background:#1a2940; color:#fff; cursor:pointer;
+                  display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <strong style="font-size:1.05rem;">&#128203; Physician Analysis</strong>
+          <span style="font-size:0.85rem; color:#aac4e0; margin-left:0.8rem;">
+            HRV Feature Contributions (SHAP Explainability)
+          </span>
+        </div>
+        <span style="font-size:0.9rem; color:#aac4e0;">Click to expand &#9660;</span>
+      </div>
+
+      <div id="physician-body" style="display:none; padding:1.4rem;">
+
+        <!-- What SHAP is -->
+        <p style="color:#555; font-size:0.95rem; margin-bottom:1rem; line-height:1.7;">
+          The chart below shows which of the patient's <strong>15 heart rhythm (HRV) features</strong>
+          drove the Random Forest model's AFib prediction.
+          <strong style="color:#e74c3c;">Red bars</strong> pushed the prediction toward AFib.
+          <strong style="color:#3498db;">Blue bars</strong> pushed it toward Normal.
+          Longer bars = stronger contribution.
+        </p>
+
+        <!-- SHAP waterfall chart -->
+        <img src="/{{ shap_plot }}" alt="SHAP Feature Contributions"
+             style="width:100%; max-width:800px; display:block; margin:0 auto; border-radius:6px;">
+
+        <!-- Plain English guide to each key feature -->
+        <div style="margin-top:1.4rem;">
+          <h4 style="color:#1a2940; margin-bottom:0.8rem;">Feature Reference Guide</h4>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.6rem; font-size:0.88rem;">
+
+            <div style="padding:0.6rem 0.8rem; background:#f8f9fb; border-radius:6px; border-left:3px solid #e74c3c;">
+              <strong>RMSSD</strong> — Root mean square of successive beat interval differences.
+              High RMSSD means beats are arriving very irregularly — classic AFib sign.
+            </div>
+
+            <div style="padding:0.6rem 0.8rem; background:#f8f9fb; border-radius:6px; border-left:3px solid #e74c3c;">
+              <strong>pNN50</strong> — Percentage of consecutive beat intervals differing by &gt;50ms.
+              Normal hearts have low pNN50. AFib patients typically show &gt;20%.
+            </div>
+
+            <div style="padding:0.6rem 0.8rem; background:#f8f9fb; border-radius:6px; border-left:3px solid #e74c3c;">
+              <strong>SD1 (Poincaré)</strong> — Short-term beat-to-beat variability.
+              Elevated SD1 indicates rapid random changes in rhythm typical of AFib.
+            </div>
+
+            <div style="padding:0.6rem 0.8rem; background:#f8f9fb; border-radius:6px; border-left:3px solid #e74c3c;">
+              <strong>Entropy</strong> — Unpredictability of the beat interval sequence.
+              AFib produces high entropy (chaotic). Normal sinus rhythm is more predictable.
+            </div>
+
+            <div style="padding:0.6rem 0.8rem; background:#f8f9fb; border-radius:6px; border-left:3px solid #3498db;">
+              <strong>Mean RR</strong> — Average time between heartbeats (ms).
+              Normal resting value ~600–1000ms. Indicates overall heart rate.
+            </div>
+
+            <div style="padding:0.6rem 0.8rem; background:#f8f9fb; border-radius:6px; border-left:3px solid #3498db;">
+              <strong>SD2 (Poincaré)</strong> — Long-term beat variability.
+              Reflects slower autonomic nervous system control of heart rhythm.
+            </div>
+
+            <div style="padding:0.6rem 0.8rem; background:#f8f9fb; border-radius:6px; border-left:3px solid #888;">
+              <strong>LF/HF Ratio</strong> — Low-frequency to high-frequency power ratio.
+              Reflects autonomic balance. Disrupted in AFib due to loss of vagal control.
+            </div>
+
+            <div style="padding:0.6rem 0.8rem; background:#f8f9fb; border-radius:6px; border-left:3px solid #888;">
+              <strong>Heart Rate</strong> — Beats per minute derived from R-peak spacing.
+              AFib often presents with elevated and irregular ventricular rate.
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Technical summary for physician -->
+        <div style="margin-top:1.2rem; padding:0.9rem 1rem; background:#eef3fa;
+                    border-radius:6px; font-size:0.9rem; color:#2c3e50; line-height:1.8;">
+          <strong>Model Summary:</strong>
+          Random Forest probability: <strong>{{ rf_prob_pct }}%</strong> &nbsp;|&nbsp;
+          CNN-LSTM probability: <strong>{{ cnn_prob_pct }}%</strong> &nbsp;|&nbsp;
+          Ensemble average: <strong>{{ afib_prob_pct }}%</strong><br>
+          CHA&#8322;DS&#8322;-VASc score: <strong>{{ chads_score }}/9</strong> &nbsp;|&nbsp;
+          Base stroke risk: <strong>{{ annual_stroke_risk }}%/year</strong> &nbsp;|&nbsp;
+          Composite risk: <strong>{{ composite_stroke_risk }}%/year</strong>
+        </div>
+
+      </div>
+    </div>
+    {% endif %}
 
     <!-- Explanation -->
     <div class="explanation-box" style="border-color:{{ risk_color }};">
